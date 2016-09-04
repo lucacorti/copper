@@ -1,0 +1,2 @@
+%{"ankh": {:git, "https://github.com/lucacorti/ankh.git", "e98d2b6445dcc07a3bb490d4e5b28dfd67782829", [branch: :master]},
+  "hpack": {:hex, :hpack, "1.0.2", "94f6e7214e3184d2ab9670a22c80c80b46651a17e35fd02e5c3c4d2ce2466d02", [:mix], []}}
