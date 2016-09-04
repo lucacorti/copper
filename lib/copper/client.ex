@@ -10,9 +10,7 @@ defmodule Copper.Client do
   end
 
   def init(uri) do
-    with {:ok, pid} <- Connection.start_link(uri) do
-      {:ok, %{uri: uri, last_stream_id: -1, connection: pid}}
-    end
+    {:ok, %{uri: uri, last_stream_id: -1, connection: nil}}
   end
 
   def delete(address, headers \\ []) do
@@ -41,10 +39,19 @@ defmodule Copper.Client do
     end
 
     full_headers = [{":method", method} | headers_for_uri(uri)] ++ headers
-    GenServer.call(via, {:request, method, uri, full_headers})
+    GenServer.call(via, {:request, method, full_headers})
   end
 
-  def handle_call({:request, method, _uri, headers}, _from,
+  def handle_call(request, from, %{uri: uri, connection: nil} = state) do
+    with {:ok, pid} <- Connection.start_link(uri) do
+      handle_call(request, from, %{state | connection: pid})
+    else
+      _ ->
+        raise "Can't start connection for #{uri}"
+    end
+  end
+
+  def handle_call({:request, method, headers}, _from,
   %{last_stream_id: last_stream_id, connection: connection} = state) do
     stream_id = last_stream_id + 2
     with :ok <- do_request(connection, stream_id, method, headers) do
