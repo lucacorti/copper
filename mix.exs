@@ -2,12 +2,24 @@ defmodule Copper.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :copper,
-     version: "0.0.1",
-     elixir: "~> 1.3",
-     build_embedded: Mix.env == :prod,
-     start_permanent: Mix.env == :prod,
-     deps: deps]
+    [
+      app: :copper,
+      version: "0.0.1",
+      elixir: "~> 1.2",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
+      description: "Pure Elixir HTTP/2 client based on Ankh",
+      package: package,
+      deps: deps
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["Luca Corti"],
+      licenses: ["MIT"],
+      links: %{ "GitHub": "https://github.com/lucacorti/copper" }
+    ]
   end
 
   # Configuration for the OTP application
@@ -28,6 +40,9 @@ defmodule Copper.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:ankh, github: "lucacorti/ankh", branch: :master}]
+    [
+      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:ankh, "~> 0.0.1"}
+    ]
   end
 end
