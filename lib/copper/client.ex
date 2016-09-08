@@ -5,61 +5,65 @@ defmodule Copper.Client do
   alias Ankh.{Connection, Frame}
   alias Ankh.Frame.{Data, Headers}
 
-  def start_link(%URI{} = uri, options \\ []) do
-    GenServer.start_link(__MODULE__, uri, options)
+  def start_link(%URI{} = uri, target, stream, options \\ []) do
+    GenServer.start_link(__MODULE__, [uri: uri, target: target, stream: stream], options)
   end
 
-  def init(uri) do
-    {:ok, %{uri: uri, last_stream_id: -1, connection: nil}}
+  def init([uri: uri, target: target, stream: stream]) do
+    {:ok, %{uri: uri, last_stream_id: -1, connection: nil, target: target, stream: stream}}
   end
 
-  def get(address, headers \\ [], data \\ nil) do
-    request("GET", address, headers, data)
+  def get(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil)
+ do
+    request("GET", address, headers, data, stream, receiver)
   end
 
-  def head(address, headers \\ [], data \\ nil) do
-    request("HEAD", address, headers, data)
+  def head(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("HEAD", address, headers, data, stream, receiver)
   end
 
-  def post(address, headers \\ [], data \\ nil) do
-    request("POST", address, headers, data)
+  def post(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("POST", address, headers, data, stream, receiver)
   end
 
-  def put(address, headers \\ [], data \\ nil) do
-    request("PUT", address, headers, data)
+  def put(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("PUT", address, headers, data, stream, receiver)
   end
 
-  def delete(address, headers \\ [], data \\ nil) do
-    request("DELETE", address, headers, data)
+  def delete(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("DELETE", address, headers, data, stream, receiver)
   end
 
-  def connect(address, headers \\ [], data \\ nil) do
-    request("CONNECT", address, headers, data)
+  def connect(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("CONNECT", address, headers, data, stream, receiver)
   end
 
-  def options(address, headers \\ [], data \\ nil) do
-    request("OPTIONS", address, headers, data)
+  def options(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("OPTIONS", address, headers, data, stream, receiver)
   end
 
-  def trace(address, headers \\ [], data \\ nil) do
-    request("TRACE", address, headers, data)
+  def trace(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
+    request("TRACE", address, headers, data, stream, receiver)
   end
 
-  def request(method, address, headers, data) do
+  def request(method, address, headers, data, stream, receiver) do
+    target = if is_pid(receiver), do: receiver, else: self()
     uri = parse_address(address)
     via = {:via, Client.Registry, uri}
 
     with :undefined <- Client.Registry.whereis_name(uri) do
       options = [name: via]
-      {:ok, pid} = Supervisor.start_child(Client.Supervisor, [uri, options])
+      {:ok, pid} = Supervisor.start_child(Client.Supervisor, [uri, target,
+      stream, options])
     end
 
     full_headers = [{":method", method} | headers_for_uri(uri)] ++ headers
     GenServer.call(via, {:request, method, full_headers, data})
   end
 
-  def handle_call(request, from, %{uri: uri, connection: nil} = state) do
-    with {:ok, pid} <- Connection.start_link(uri) do
+  def handle_call(request, from, %{uri: uri, connection: nil, target: target,
+  stream: stream} = state) do
+    with {:ok, pid} <- Connection.start_link(uri, stream, target) do
       handle_call(request, from, %{state | connection: pid})
     else
       _ ->
