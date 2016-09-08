@@ -3,7 +3,7 @@ defmodule Copper.Client do
 
   alias Copper.Client
   alias Ankh.{Connection, Frame}
-  alias Ankh.Frame.{Headers}
+  alias Ankh.Frame.{Data, Headers}
 
   def start_link(%URI{} = uri, options \\ []) do
     GenServer.start_link(__MODULE__, uri, options)
@@ -13,23 +13,39 @@ defmodule Copper.Client do
     {:ok, %{uri: uri, last_stream_id: -1, connection: nil}}
   end
 
-  def delete(address, headers \\ []) do
-    request("DELETE", address, headers)
+  def get(address, headers \\ [], data \\ nil) do
+    request("GET", address, headers, data)
   end
 
-  def get(address, headers \\ []) do
-    request("GET", address, headers)
+  def head(address, headers \\ [], data \\ nil) do
+    request("HEAD", address, headers, data)
   end
 
-  def post(address, headers \\ []) do
-    request("POST", address, headers)
+  def post(address, headers \\ [], data \\ nil) do
+    request("POST", address, headers, data)
   end
 
-  def put(address, headers \\ []) do
-    request("PUT", address, headers)
+  def put(address, headers \\ [], data \\ nil) do
+    request("PUT", address, headers, data)
   end
 
-  def request(method, address, headers \\ []) do
+  def delete(address, headers \\ [], data \\ nil) do
+    request("DELETE", address, headers, data)
+  end
+
+  def connect(address, headers \\ [], data \\ nil) do
+    request("CONNECT", address, headers, data)
+  end
+
+  def options(address, headers \\ [], data \\ nil) do
+    request("OPTIONS", address, headers, data)
+  end
+
+  def trace(address, headers \\ [], data \\ nil) do
+    request("TRACE", address, headers, data)
+  end
+
+  def request(method, address, headers, data) do
     uri = parse_address(address)
     via = {:via, Client.Registry, uri}
 
@@ -39,7 +55,7 @@ defmodule Copper.Client do
     end
 
     full_headers = [{":method", method} | headers_for_uri(uri)] ++ headers
-    GenServer.call(via, {:request, method, full_headers})
+    GenServer.call(via, {:request, method, full_headers, data})
   end
 
   def handle_call(request, from, %{uri: uri, connection: nil} = state) do
@@ -51,10 +67,10 @@ defmodule Copper.Client do
     end
   end
 
-  def handle_call({:request, method, headers}, _from,
+  def handle_call({:request, method, headers, data}, _from,
   %{last_stream_id: last_stream_id, connection: connection} = state) do
     stream_id = last_stream_id + 2
-    with :ok <- do_request(connection, stream_id, method, headers) do
+    with :ok <- do_request(connection, stream_id, method, headers, data) do
       {:reply, :ok, %{state | last_stream_id: stream_id}}
     else
       error ->
@@ -62,14 +78,25 @@ defmodule Copper.Client do
     end
   end
 
-  defp do_request(connection, stream_id, "GET", headers) do
-    Connection.send(connection, %Frame{stream_id: stream_id,
-      type: :headers, flags: %Headers.Flags{end_headers: true},
+  defp do_request(connection, stream_id, "GET", headers, nil) do
+    Connection.send(connection, %Frame{stream_id: stream_id, type: :headers,
+      flags: %Headers.Flags{end_headers: true},
       payload: %Headers.Payload{header_block_fragment: headers}
     })
   end
 
-  defp do_request(_connection, _stream_id, method, _headers) do
+  defp do_request(connection, stream_id, "GET", headers, data) do
+    Connection.send(connection, %Frame{stream_id: stream_id, type: :headers,
+      flags: %Headers.Flags{end_headers: true},
+      payload: %Headers.Payload{header_block_fragment: headers}
+    })
+    Connection.send(connection, %Frame{stream_id: stream_id, type: :data,
+      flags: %Data.Flags{end_stream: true},
+      payload: %Data.Payload{data: data}
+    })
+  end
+
+  defp do_request(_connection, _stream_id, method, _headers, _data) do
     raise "Method \"#{method}\" not implemented yet."
   end
 
