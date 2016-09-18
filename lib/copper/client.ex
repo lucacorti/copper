@@ -5,56 +5,60 @@ defmodule Copper.Client do
   alias Ankh.{Connection, Frame}
   alias Ankh.Frame.{Data, Headers}
 
-  def start_link(%URI{} = uri, target, stream, options \\ []) do
-    GenServer.start_link(__MODULE__, [uri: uri, target: target, stream: stream], options)
+  def start_link(args, options \\ []) do
+    GenServer.start_link(__MODULE__, args, options)
   end
 
-  def init([uri: uri, target: target, stream: stream]) do
-    {:ok, %{uri: uri, last_stream_id: -1, connection: nil, target: target, stream: stream}}
+  def init([uri: uri, target: target, stream: stream, ssl_options: ssl_opts]) do
+    {:ok, %{uri: uri, last_stream_id: -1, connection: nil, target: target,
+    stream: stream, ssl_options: ssl_opts}}
   end
 
-  def get(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil)
- do
-    request("GET", address, headers, data, stream, receiver)
+  def get(address, headers \\ [], data \\ nil, options \\ []) do
+    request("GET", address, headers, data, options)
   end
 
-  def head(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("HEAD", address, headers, data, stream, receiver)
+  def head(address, headers \\ [], data \\ nil, options \\ []) do
+    request("HEAD", address, headers, data, options)
   end
 
-  def post(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("POST", address, headers, data, stream, receiver)
+  def post(address, headers \\ [], data \\ nil, options \\ []) do
+    request("POST", address, headers, data, options)
   end
 
-  def put(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("PUT", address, headers, data, stream, receiver)
+  def put(address, headers \\ [], data \\ nil, options \\ []) do
+    request("PUT", address, headers, data, options)
   end
 
-  def delete(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("DELETE", address, headers, data, stream, receiver)
+  def delete(address, headers \\ [], data \\ nil, options \\ []) do
+    request("DELETE", address, headers, data, options)
   end
 
-  def connect(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("CONNECT", address, headers, data, stream, receiver)
+  def connect(address, headers \\ [], data \\ nil, options \\ []) do
+    request("CONNECT", address, headers, data, options)
   end
 
-  def options(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("OPTIONS", address, headers, data, stream, receiver)
+  def options(address, headers \\ [], data \\ nil, options \\ []) do
+    request("OPTIONS", address, headers, data, options)
   end
 
-  def trace(address, headers \\ [], data \\ nil, stream \\ false, receiver \\ nil) do
-    request("TRACE", address, headers, data, stream, receiver)
+  def trace(address, headers \\ [], data \\ nil, options \\ []) do
+    request("TRACE", address, headers, data, options)
   end
 
-  def request(method, address, headers, data, stream, receiver) do
-    target = if is_pid(receiver), do: receiver, else: self()
+  def request(method, address, headers \\ [], data \\ nil, options \\ []) do
     uri = parse_address(address)
     via = {:via, Client.Registry, uri}
 
     with :undefined <- Client.Registry.whereis_name(uri) do
-      options = [name: via]
-      {:ok, pid} = Supervisor.start_child(Client.Supervisor, [uri, target,
-      stream, options])
+      receiver = Keyword.get(options, :receiver)
+      target = if is_pid(receiver), do: receiver, else: self()
+      stream = Keyword.get(options, :stream, false)
+      mode = if is_boolean(stream), do: stream, else: false
+      ssl_opts = Keyword.get(options, :ssl_options, [])
+      args = [uri: uri, target: target, stream: mode, ssl_options: ssl_opts]
+      opts = [name: via]
+      {:ok, pid} = Supervisor.start_child(Client.Supervisor, [args, opts])
     end
 
     full_headers = [{":method", method} | headers_for_uri(uri)] ++ headers
@@ -62,8 +66,9 @@ defmodule Copper.Client do
   end
 
   def handle_call(request, from, %{uri: uri, connection: nil, target: target,
-  stream: stream} = state) do
-    with {:ok, pid} <- Connection.start_link(uri, stream, target) do
+  stream: stream, ssl_options: ssl_opts} = state) do
+    opts = [uri: uri, receiver: target, stream: stream, ssl_options: ssl_opts]
+    with {:ok, pid} <- Connection.start_link(opts) do
       handle_call(request, from, %{state | connection: pid})
     else
       _ ->
@@ -114,12 +119,12 @@ defmodule Copper.Client do
     raise "No scheme present in address"
   end
 
-  defp parse_address(%URI{host: nil}) do
-    raise "No hostname present in address"
-  end
-
   defp parse_address(%URI{scheme: "http"}) do
     raise "Plaintext HTTP is not supported"
+  end
+
+  defp parse_address(%URI{host: nil}) do
+    raise "No hostname present in address"
   end
 
   defp parse_address(%URI{} = uri), do: uri
