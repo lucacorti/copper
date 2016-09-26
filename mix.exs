@@ -42,7 +42,9 @@ defmodule Copper.Mixfile do
   defp deps do
     [
       {:ex_doc, ">= 0.0.0", only: :dev},
-      {:ankh, "~> 0.0.4"}
+      {:credo, ">= 0.0.0", only: :dev},
+      {:dialyxir, ">= 0.0.0", only: :dev},
+      {:ankh, "~> 0.0.5"}
     ]
   end
 end
