@@ -43,7 +43,7 @@ defmodule Copper.Client.Registry do
 
   defp remove_pid(state, pid_to_remove) do
     state
-    |> Enum.filter(fn {_key, pid} -> pid  != pid_to_remove end)
+    |> Enum.filter(fn {_key, pid} -> pid != pid_to_remove end)
     |> Enum.into(%{})
   end
 end
