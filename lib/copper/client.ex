@@ -2,8 +2,10 @@ defmodule Copper.Client do
   use GenServer
 
   alias Copper.Client
-  alias Ankh.{Connection, Frame}
+  alias Ankh.Connection
   alias Ankh.Frame.{Data, Headers}
+
+  @max_stream_id 2_147_483_648
 
   def start_link(args, options \\ []) do
     GenServer.start_link(__MODULE__, args, options)
@@ -76,6 +78,12 @@ defmodule Copper.Client do
     end
   end
 
+  def handle_call(request, from, %{connection: connection,
+  last_stream_id: lsid} = state) when lsid == @max_stream_id do
+    Connection.close(connection)
+    handle_call(request, from, %{state | connection: nil, last_stream_id: -1})
+  end
+
   def handle_call({:request, method, headers, data}, _from,
   %{last_stream_id: last_stream_id, connection: connection} = state) do
     stream_id = last_stream_id + 2
@@ -88,18 +96,18 @@ defmodule Copper.Client do
   end
 
   defp do_request(connection, stream_id, "GET", headers, nil) do
-    Connection.send(connection, %Frame{stream_id: stream_id, type: :headers,
+    Connection.send(connection, %Headers{stream_id: stream_id,
       flags: %Headers.Flags{end_headers: true},
       payload: %Headers.Payload{header_block_fragment: headers}
     })
   end
 
   defp do_request(connection, stream_id, "GET", headers, data) do
-    Connection.send(connection, %Frame{stream_id: stream_id, type: :headers,
+    Connection.send(connection, %Headers{stream_id: stream_id,
       flags: %Headers.Flags{end_headers: true},
       payload: %Headers.Payload{header_block_fragment: headers}
     })
-    Connection.send(connection, %Frame{stream_id: stream_id, type: :data,
+    Connection.send(connection, %Data{stream_id: stream_id,
       flags: %Data.Flags{end_stream: true},
       payload: %Data.Payload{data: data}
     })

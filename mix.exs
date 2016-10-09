@@ -44,7 +44,7 @@ defmodule Copper.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:credo, ">= 0.0.0", only: :dev},
       {:dialyxir, ">= 0.0.0", only: :dev},
-      {:ankh, "~> 0.0.5"}
+      {:ankh, "0.1.0"}
     ]
   end
 end
