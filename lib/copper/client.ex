@@ -11,8 +11,8 @@ defmodule Copper.Client do
     GenServer.start_link(__MODULE__, args, options)
   end
 
-  def init([uri: uri, target: target, stream: stream, ssl_options: ssl_opts]) do
-    {:ok, %{uri: uri, last_stream_id: -1, connection: nil, target: target,
+  def init([target: target, stream: stream, ssl_options: ssl_opts]) do
+    {:ok, %{last_stream_id: -1, connection: nil, target: target,
     stream: stream, ssl_options: ssl_opts}}
   end
 
@@ -58,19 +58,21 @@ defmodule Copper.Client do
       stream = Keyword.get(options, :stream, false)
       mode = if is_boolean(stream), do: stream, else: false
       ssl_opts = Keyword.get(options, :ssl_options, [])
-      args = [uri: uri, target: target, stream: mode, ssl_options: ssl_opts]
+      args = [target: target, stream: mode, ssl_options: ssl_opts]
       opts = [name: via]
       {:ok, pid} = Supervisor.start_child(Client.Supervisor, [args, opts])
     end
 
     full_headers = [{":method", method} | headers_for_uri(uri)] ++ headers
-    GenServer.call(via, {:request, method, full_headers, data})
+    GenServer.call(via, {:request, uri, method, full_headers, data})
   end
 
-  def handle_call(request, from, %{uri: uri, connection: nil, target: target,
-  stream: stream, ssl_options: ssl_opts} = state) do
-    opts = [uri: uri, receiver: target, stream: stream, ssl_options: ssl_opts]
-    with {:ok, pid} <- Connection.start_link(opts) do
+  def handle_call({:request, uri, _method, _headers, _data} = request, from,
+  %{connection: nil, target: target, stream: stream, ssl_options: ssl_opts}
+  = state) do
+    opts = [receiver: target, stream: stream, ssl_options: ssl_opts]
+    with {:ok, pid} <- Connection.start_link(opts),
+         :ok <- Connection.connect(pid, uri) do
       handle_call(request, from, %{state | connection: pid})
     else
       _ ->
@@ -84,7 +86,7 @@ defmodule Copper.Client do
     handle_call(request, from, %{state | connection: nil, last_stream_id: -1})
   end
 
-  def handle_call({:request, method, headers, data}, _from,
+  def handle_call({:request, _uri, method, headers, data}, _from,
   %{last_stream_id: last_stream_id, connection: connection} = state) do
     stream_id = last_stream_id + 2
     with :ok <- do_request(connection, stream_id, method, headers, data) do
