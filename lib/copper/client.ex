@@ -60,7 +60,7 @@ defmodule Copper.Client do
       ssl_opts = Keyword.get(options, :ssl_options, [])
       args = [target: target, stream: mode, ssl_options: ssl_opts]
       opts = [name: via]
-      {:ok, pid} = Supervisor.start_child(Client.Supervisor, [args, opts])
+      {:ok, _pid} = Supervisor.start_child(Client.Supervisor, [args, opts])
     end
 
     full_headers = [{":method", method} | headers_for_uri(uri)] ++ headers
