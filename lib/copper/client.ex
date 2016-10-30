@@ -115,6 +115,13 @@ defmodule Copper.Client do
     })
   end
 
+  defp do_request(connection, stream_id, "HEAD", headers, nil) do
+    Connection.send(connection, %Headers{stream_id: stream_id,
+      flags: %Headers.Flags{end_headers: true},
+      payload: %Headers.Payload{header_block_fragment: headers}
+    })
+  end
+
   defp do_request(_connection, _stream_id, method, _headers, _data) do
     raise "Method \"#{method}\" not implemented yet."
   end
