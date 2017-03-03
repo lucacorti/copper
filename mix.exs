@@ -32,7 +32,7 @@ defmodule Copper.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:credo, ">= 0.0.0", only: :dev},
       {:dialyxir, ">= 0.0.0", only: :dev},
-      {:ankh, path: "../ankh"}
+      {:ankh, "0.1.1"}
     ]
   end
 end
