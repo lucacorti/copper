@@ -3,9 +3,9 @@ defmodule Copper.Client do
 
   alias Copper.Client
   alias Ankh.Connection
-  alias Ankh.Frame.{Data, Headers}
+  alias Ankh.Frame.{Data, Headers, Settings}
 
-  @max_stream_id 2_147_483_648
+  @max_stream_id 2_147_483_647
 
   def start_link(args, options \\ []) do
     GenServer.start_link(__MODULE__, args, options)
@@ -72,7 +72,8 @@ defmodule Copper.Client do
   = state) do
     opts = [receiver: target, stream: stream, ssl_options: ssl_opts]
     with {:ok, pid} <- Connection.start_link(opts),
-         :ok <- Connection.connect(pid, uri) do
+         :ok <- Connection.connect(pid, uri),
+         :ok <- Connection.send(pid, %Settings{}) do
       handle_call(request, from, %{state | connection: pid})
     else
       _ ->
@@ -95,6 +96,10 @@ defmodule Copper.Client do
       error ->
         {:reply, error, state}
     end
+  end
+
+  defp do_request(nil, _stream_id, _method, _headers, _data) do
+    {:error, :not_connected}
   end
 
   defp do_request(connection, stream_id, "GET", headers, nil) do
