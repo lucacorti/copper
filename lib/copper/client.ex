@@ -100,14 +100,14 @@ defmodule Copper.Client do
   defp do_request(connection, stream_id, "GET", headers, nil) do
     Connection.send(connection, %Headers{stream_id: stream_id,
       flags: %Headers.Flags{end_headers: true},
-      payload: %Headers.Payload{header_block_fragment: headers}
+      payload: %Headers.Payload{hbf: headers}
     })
   end
 
   defp do_request(connection, stream_id, "GET", headers, data) do
     Connection.send(connection, %Headers{stream_id: stream_id,
       flags: %Headers.Flags{end_headers: true},
-      payload: %Headers.Payload{header_block_fragment: headers}
+      payload: %Headers.Payload{hbf: headers}
     })
     Connection.send(connection, %Data{stream_id: stream_id,
       flags: %Data.Flags{end_stream: true},
@@ -118,7 +118,7 @@ defmodule Copper.Client do
   defp do_request(connection, stream_id, "HEAD", headers, nil) do
     Connection.send(connection, %Headers{stream_id: stream_id,
       flags: %Headers.Flags{end_headers: true},
-      payload: %Headers.Payload{header_block_fragment: headers}
+      payload: %Headers.Payload{hbf: headers}
     })
   end
 
