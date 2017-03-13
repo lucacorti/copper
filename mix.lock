@@ -1,4 +1,4 @@
-%{"ankh": {:hex, :ankh, "0.1.1", "6a4465d984f8add1d7d80de0f4987fbe441fb52d3b6788ae1493c3b9338e8548", [:mix], [{:hpack, "~> 1.0.2", [hex: :hpack, optional: false]}]},
+%{"ankh": {:hex, :ankh, "0.3.0", "d091ed7dfbb6eb45a7349d527aa4aa3272410f62c8198b997714e7956e1583de", [:mix], [{:hpack, "~> 1.0.2", [hex: :hpack, optional: false]}]},
   "bunt": {:hex, :bunt, "0.2.0", "951c6e801e8b1d2cbe58ebbd3e616a869061ddadcc4863d0a2182541acae9a38", [:mix], []},
   "credo": {:hex, :credo, "0.6.1", "a941e2591bd2bd2055dc92b810c174650b40b8290459c89a835af9d59ac4a5f8", [:mix], [{:bunt, "~> 0.2.0", [hex: :bunt, optional: false]}]},
   "dialyxir": {:hex, :dialyxir, "0.5.0", "5bc543f9c28ecd51b99cc1a685a3c2a1a93216990347f259406a910cf048d1d7", [:mix], []},

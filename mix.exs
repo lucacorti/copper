@@ -23,7 +23,7 @@ defmodule Copper.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :ssl],
+    [applications: [:logger, :ankh],
      mod: {Copper, []}]
   end
 
@@ -32,7 +32,7 @@ defmodule Copper.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:credo, ">= 0.0.0", only: :dev},
       {:dialyxir, ">= 0.0.0", only: :dev},
-      {:ankh, "0.1.1"}
+      {:ankh, "0.3.0"}
     ]
   end
 end

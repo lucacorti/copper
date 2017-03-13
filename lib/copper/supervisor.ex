@@ -8,10 +8,7 @@ defmodule Copper.Supervisor do
   end
 
   def init([]) do
-    [
-      worker(Client.Supervisor, []),
-      worker(Client.Registry, [])
-    ]
+    [worker(Client.Supervisor, []), worker(Client.Registry, [])]
     |> supervise(strategy: :one_for_one)
   end
 end
