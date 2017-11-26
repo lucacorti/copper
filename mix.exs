@@ -5,7 +5,7 @@ defmodule Copper.Mixfile do
     [
       app: :copper,
       version: "0.0.1",
-      elixir: "~> 1.2",
+      elixir: "~> 1.5",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       description: "Pure Elixir HTTP/2 client based on Ankh",
@@ -14,7 +14,7 @@ defmodule Copper.Mixfile do
     ]
   end
 
-  defp package do
+  defp package() do
     [
       maintainers: ["Luca Corti"],
       licenses: ["MIT"],
@@ -22,8 +22,8 @@ defmodule Copper.Mixfile do
     ]
   end
 
-  def application do
-    [applications: [:logger, :ankh],
+  def application() do
+    [extra_applications: [:logger],
      mod: {Copper, []}]
   end
 
@@ -32,7 +32,8 @@ defmodule Copper.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:credo, ">= 0.0.0", only: :dev},
       {:dialyxir, ">= 0.0.0", only: :dev},
-      {:ankh, "0.3.1"}
+      {:hpack, "~> 1.0.0"},
+      {:ankh, github: "lucacorti/ankh", branch: "master"}
     ]
   end
 end
