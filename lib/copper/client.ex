@@ -187,7 +187,7 @@ defmodule Copper.Client do
         error_code: :no_error
       }
     })
-    :ok = Connection.close(connection)
+    Connection.close(connection)
   end
 
   defp process_frame(%{flags: %{end_headers: true}},
