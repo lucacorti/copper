@@ -164,7 +164,7 @@ defmodule Copper.Client do
           length: 0
       })
 
-    HPack.Table.resize(payload.header_table_size, send_hpack)
+    Table.resize(payload.header_table_size, send_hpack)
     {:noreply, %{state | send_settings: payload}}
   end
 
@@ -181,7 +181,8 @@ defmodule Copper.Client do
   end
 
   def handle_info(
-        {:ankh, :frame, %WindowUpdate{stream_id: 0, payload: %{window_size_increment: increment}}},
+        {:ankh, :frame,
+         %WindowUpdate{stream_id: 0, payload: %{window_size_increment: increment}}},
         %{window_size: window_size} = state
       ) do
     {:noreply, %{state | window_size: window_size + increment}}
