@@ -210,7 +210,7 @@ defmodule Copper.Client do
             }
 
             Connection.send(connection, %{window_update | stream_id: 0})
-            Stream.send(stream, %{window_update | stream_id: id})
+            Stream.send(stream, window_update)
           end)
 
         _ ->
