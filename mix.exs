@@ -31,8 +31,7 @@ defmodule Copper.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:credo, ">= 0.0.0", only: :dev},
       {:dialyxir, ">= 0.0.0", only: :dev},
-      {:hpack, "~> 1.0.0"},
-      {:ankh, github: "lucacorti/ankh", branch: "master"}
+      {:ankh, ">= 0.4.0"}
     ]
   end
 end

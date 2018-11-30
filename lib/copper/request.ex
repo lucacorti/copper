@@ -1,46 +1,4 @@
 defmodule Copper.Request do
-  alias Ankh.Frame.{Data, Headers, Utils}
-
-  def headers(stream_id, "GET", headers, max_frame_size) do
-    {:ok,
-     Utils.split(
-       %Headers{
-         stream_id: stream_id,
-         payload: %Headers.Payload{hbf: headers}
-       },
-       max_frame_size
-     )}
-  end
-
-  def headers(stream_id, "HEAD", headers, max_frame_size) do
-    {:ok,
-     Utils.split(
-       %Headers{
-         stream_id: stream_id,
-         payload: %Headers.Payload{hbf: headers}
-       },
-       max_frame_size
-     )}
-  end
-
-  def headers(_stream_id, method, _headers, _max_frame_size) do
-    {:error, "Method #{method} not implemented yet."}
-  end
-
-  def data(_stream_id, _method, nil, _max_frame_size), do: {:ok, []}
-
-  def data(stream_id, "GET", data, max_frame_size) do
-    {:ok,
-     Utils.split(
-       %Data{
-         stream_id: stream_id,
-         payload: %Data.Payload{data: data}
-       },
-       max_frame_size,
-       true
-     )}
-  end
-
   def parse_address(address) when is_binary(address) do
     address
     |> URI.parse()
