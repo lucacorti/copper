@@ -4,7 +4,7 @@ defmodule Copper.Client do
   require Logger
 
   alias Ankh.{Connection, Stream}
-  alias Ankh.Frame.{Headers, Settings}
+  alias Ankh.Frame.Settings
   alias Copper.Request
 
   def start_link(args, options \\ []) do
@@ -35,44 +35,12 @@ defmodule Copper.Client do
      }}
   end
 
-  def get(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "GET", path, headers, data, options)
-  end
-
-  def head(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "HEAD", path, headers, data, options)
-  end
-
-  def post(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "POST", path, headers, data, options)
-  end
-
-  def put(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "PUT", path, headers, data, options)
-  end
-
-  def delete(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "DELETE", path, headers, data, options)
-  end
-
-  def connect(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "CONNECT", path, headers, data, options)
-  end
-
-  def options(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "OPTIONS", path, headers, data, options)
-  end
-
-  def trace(client, path \\ "/", headers \\ [], data \\ nil, options \\ []) do
-    request(client, "TRACE", path, headers, data, options)
-  end
-
-  def request(client, method, path, headers, data, options) do
-    GenServer.call(client, {:request, method, path, headers, data, options})
+  def request(client, request) do
+    GenServer.call(client, {:request, request})
   end
 
   def handle_call(
-        {:request, _, _, _, _, _} = request,
+        {:request, request},
         from,
         %{
           connection: nil,
@@ -82,29 +50,24 @@ defmodule Copper.Client do
       ) do
     {:ok, connection} = Connection.start_link(uri: uri, controlling_process: controlling_process)
     :ok = Connection.connect(connection)
-    handle_call(request, from, %{state | connection: connection})
+    handle_call({:request, request}, from, %{state | connection: connection})
   end
 
   def handle_call(
-        {:request, method, path, headers, _data, options},
+        {:request, %Request{options: options} = request},
         _from,
         %{
           connection: connection,
           uri: uri,
         } = state
       ) do
-    headers =
-      %URI{uri | path: path}
-      |> Request.headers_for_uri(method)
-      |> Enum.into(headers)
-
-    mode = Keyword.get(options, :mode, :reassemble)
+    request = %Request{request | uri: uri}
+    mode = options
+      |> Keyword.get(:mode, :reassemble)
 
     with {:ok, stream} <- Connection.start_stream(connection, mode),
-         {:ok, _stream_state} <-
-           Stream.send(stream, %Headers{
-             payload: %Headers.Payload{hbf: headers}
-           }) do
+         :ok <- send_headers(stream, request),
+         :ok <- send_data(stream, request) do
       {:reply, :ok, state}
     else
       error ->
@@ -119,5 +82,29 @@ defmodule Copper.Client do
   def terminate(reason, %{connection: connection}) do
     Logger.error("Connection terminate: #{reason}")
     Connection.close(connection)
+  end
+
+  defp send_data(stream, request) do
+    case Request.data(request) do
+      nil ->
+        :ok
+
+      data ->
+        with {:ok, _stream_state} <- Stream.send(stream, data) do
+          :ok
+        else
+          error ->
+            {:error, error}
+        end
+      end
+  end
+
+  defp send_headers(stream, request) do
+    with {:ok, _stream_state} <- Stream.send(stream, Request.headers(request)) do
+      :ok
+    else
+      error ->
+        {:error, error}
+    end
   end
 end
