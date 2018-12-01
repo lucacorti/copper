@@ -4,8 +4,10 @@ defmodule CopperTest do
 
   alias Copper.{Client, Request}
 
+  @address "https://www.google.com"
+
   setup do
-    {:ok, pid} = Client.start_link(address: "https://www.google.it")
+    {:ok, pid} = Client.start_link(address: @address)
     %{client: pid}
   end
 
