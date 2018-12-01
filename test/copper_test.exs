@@ -8,7 +8,12 @@ defmodule CopperTest do
     {:ok, pid} = Client.start_link(address: "https://www.google.it")
     %{client: pid}
   end
-  
+
+  test "head", %{client: client} do
+    assert :ok = Client.request(client, %Request{method: "HEAD"})
+    assert_receive {:ankh, :headers, 1, _headers}, 1_000
+  end
+
   test "get", %{client: client} do
     assert :ok = Client.request(client, %Request{})
     assert_receive {:ankh, :headers, 1, _headers}, 1_000
