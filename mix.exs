@@ -10,7 +10,11 @@ defmodule Copper.Mixfile do
       start_permanent: Mix.env() == :prod,
       description: "Pure Elixir HTTP/2 client based on Ankh",
       package: package(),
-      deps: deps()
+      deps: deps(),
+      dialyzer: [
+        plt_add_deps: :project,
+        ignore_warnings: ".dialyzer.ignore-warnings"
+      ]
     ]
   end
 
@@ -31,7 +35,7 @@ defmodule Copper.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:credo, ">= 0.0.0", only: :dev},
       {:dialyxir, ">= 0.0.0", only: :dev},
-      {:ankh, ">= 0.4.4"}
+      {:ankh, path: "../ankh"}
     ]
   end
 end
