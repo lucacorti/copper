@@ -11,15 +11,6 @@ defmodule Copper.Client do
   alias Copper.Request
 
   def start_link(args, options \\ []) do
-    {_, args} =
-      Keyword.get_and_update(args, :controlling_process, fn
-        nil ->
-          {self(), self()}
-
-        value ->
-          {value, value}
-      end)
-
     GenServer.start_link(__MODULE__, args, options)
   end
 
@@ -29,14 +20,16 @@ defmodule Copper.Client do
     {:ok,
      %{
        uri: %URI{Request.parse_address(address) | path: nil},
-       controlling_process: Keyword.get(args, :controlling_process),
        connection: nil,
        ssl_options: Keyword.get(args, :ssl_options, [])
      }}
   end
 
-  def request(client, request) do
-    GenServer.call(client, {:request, request})
+  def request(client, %Request{options: options} = request) do
+    options = [controlling_process: self()]
+    |> Keyword.merge(options)
+
+    GenServer.call(client, {:request, %{request | options: options}})
   end
 
   def handle_call(
@@ -45,10 +38,9 @@ defmodule Copper.Client do
         %{
           connection: nil,
           uri: uri,
-          controlling_process: controlling_process
         } = state
       ) do
-    {:ok, connection} = Connection.start_link(uri: uri, controlling_process: controlling_process)
+    {:ok, connection} = Connection.start_link(uri: uri)
     :ok = Connection.connect(connection)
     handle_call({:request, request}, from, %{state | connection: connection})
   end
@@ -62,10 +54,8 @@ defmodule Copper.Client do
         } = state
       ) do
     request = %Request{request | uri: uri}
-    mode = options
-      |> Keyword.get(:mode, :reassemble)
 
-    with {:ok, stream} <- Connection.start_stream(connection, mode),
+    with {:ok, stream} <- Connection.start_stream(connection, options),
          :ok <- send_headers(stream, request),
          :ok <- send_data(stream, request) do
       {:reply, :ok, state}
