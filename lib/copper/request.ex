@@ -1,4 +1,7 @@
 defmodule Copper.Request do
+  @moduledoc """
+  Copper Request
+  """
 
   alias Ankh.Frame.{Data, Headers}
 

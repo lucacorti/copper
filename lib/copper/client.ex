@@ -1,4 +1,8 @@
 defmodule Copper.Client do
+  @moduledoc """
+  Copper Client
+  """
+
   use GenServer
 
   require Logger
