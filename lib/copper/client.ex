@@ -8,7 +8,6 @@ defmodule Copper.Client do
   require Logger
 
   alias Ankh.{Connection, Stream}
-  alias Ankh.Frame.Settings
   alias Copper.Request
 
   def start_link(args, options \\ []) do
@@ -26,16 +25,13 @@ defmodule Copper.Client do
 
   def init(args) do
     {:ok, address} = Keyword.fetch(args, :address)
-    %Settings{payload: settings} = Keyword.get(args, :settings, %Settings{})
 
     {:ok,
      %{
        uri: %URI{Request.parse_address(address) | path: nil},
        controlling_process: Keyword.get(args, :controlling_process),
        connection: nil,
-       ssl_options: Keyword.get(args, :ssl_options, []),
-       send_settings: settings,
-       recv_settings: settings,
+       ssl_options: Keyword.get(args, :ssl_options, [])
      }}
   end
 
