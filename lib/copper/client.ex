@@ -22,7 +22,7 @@ defmodule Copper.Client do
        connection: nil,
        streams: %{},
        ssl_options: Keyword.get(args, :ssl_options, []),
-       uri: %URI{Request.parse_address(address) | path: nil}
+       uri: Request.parse_address(address)
      }}
   end
 
@@ -74,11 +74,14 @@ defmodule Copper.Client do
         } = state
       )
       when is_pid(controlling_process) do
-    request = %Request{request | uri: uri}
+    request =
+      request
+      |> Request.put_uri(uri)
 
     with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
          :ok <- send_headers(stream, request),
-         :ok <- send_data(stream, request) do
+         :ok <- send_data(stream, request),
+         :ok <- send_trailers(stream, request) do
       {:reply, {:ok, stream_id}, state}
     else
       error ->
@@ -155,6 +158,21 @@ defmodule Copper.Client do
     else
       error ->
         {:error, error}
+    end
+  end
+
+  defp send_trailers(stream, request) do
+    case Request.trailers_frame(request) do
+      nil ->
+        :ok
+
+      trailers ->
+        with {:ok, _stream_state} <- Stream.send(stream, trailers) do
+          :ok
+        else
+          error ->
+            {:error, error}
+        end
     end
   end
 end
