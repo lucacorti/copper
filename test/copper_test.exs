@@ -24,16 +24,16 @@ defmodule CopperTest do
       async_request
       |> Request.put_method("HEAD")
 
-    assert :ok = Client.request(client, request)
-    receive_headers(1)
-    receive_closed(1)
+    assert {:ok, stream_id} = Client.request(client, request)
+    receive_headers(stream_id)
+    receive_closed(stream_id)
   end
 
   test "async get", %{client: client, async_request: async_request} do
-    assert :ok = Client.request(client, async_request)
-    receive_headers(1)
-    receive_data(1)
-    receive_closed(1)
+    assert {:ok, stream_id} = Client.request(client, async_request)
+    receive_headers(stream_id)
+    receive_data(stream_id)
+    receive_closed(stream_id)
   end
 
   test "async post", %{client: client, async_request: async_request} do
@@ -42,32 +42,32 @@ defmodule CopperTest do
       |> Request.put_method("POST")
       |> Request.put_body("data")
 
-    assert :ok = Client.request(client, request)
-    receive_headers(1)
-    receive_data(1)
+    assert {:ok, stream_id} = Client.request(client, request)
+    receive_headers(stream_id)
+    receive_data(stream_id)
   end
 
   test "async multiple streams", %{client: client, async_request: async_request} do
     request =
       async_request
       |> Request.put_method("HEAD")
-    assert :ok = Client.request(client, request)
-    receive_headers(1)
-    receive_closed(1)
+    assert {:ok, stream_id} = Client.request(client, request)
+    receive_headers(stream_id)
+    receive_closed(stream_id)
 
-    assert :ok = Client.request(client, async_request)
-    receive_headers(3)
-    receive_data(3)
-    receive_closed(3)
+    assert {:ok, stream_id} = Client.request(client, async_request)
+    receive_headers(stream_id)
+    receive_data(stream_id)
+    receive_closed(stream_id)
 
     request =
       async_request
       |> Request.put_method("POST")
       |> Request.put_body("data")
-    assert :ok = Client.request(client, request)
-    receive_headers(5)
-    receive_data(5)
-    receive_closed(5)
+    assert {:ok, stream_id} = Client.request(client, request)
+    receive_headers(stream_id)
+    receive_data(stream_id)
+    receive_closed(stream_id)
   end
 
   defp receive_headers(stream_id) do

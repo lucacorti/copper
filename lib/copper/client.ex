@@ -76,10 +76,10 @@ defmodule Copper.Client do
       when is_pid(controlling_process) do
     request = %Request{request | uri: uri}
 
-    with {:ok, _stream_id, stream} <- Connection.start_stream(connection, options),
+    with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
          :ok <- send_headers(stream, request),
          :ok <- send_data(stream, request) do
-      {:reply, :ok, state}
+      {:reply, {:ok, stream_id}, state}
     else
       error ->
         {:reply, {:error, error}, state}
