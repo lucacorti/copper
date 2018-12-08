@@ -9,19 +9,19 @@ defmodule Copper.Request do
             method: "GET",
             path: "/",
             headers: [],
-            data: nil,
+            body: nil,
             options: []
 
-  def data(%__MODULE__{data: nil}), do: nil
+  def data_frame(%__MODULE__{body: nil}), do: nil
 
-  def data(%__MODULE__{data: data}) do
+  def data_frame(%__MODULE__{body: body}) do
     %Data{
       flags: %Data.Flags{end_stream: true},
-      payload: %Data.Payload{data: data}
+      payload: %Data.Payload{data: body}
     }
   end
 
-  def headers(%__MODULE__{
+  def headers_frame(%__MODULE__{
         headers: headers,
         method: method,
         path: path,
@@ -35,6 +35,21 @@ defmodule Copper.Request do
       payload: %Headers.Payload{hbf: headers}
     }
   end
+
+  def put_body(%__MODULE__{} = request, body),
+    do: %__MODULE__{request | body: body}
+
+  def put_header(%__MODULE__{headers: headers} = request, header, value),
+    do: %__MODULE__{request | headers: [{header, value} | headers]}
+
+  def put_method(%__MODULE__{} = request, method),
+    do: %__MODULE__{request | method: method}
+
+  def put_option(%__MODULE__{options: options} = request, option, value),
+    do: %__MODULE__{request | options: [{option, value} | options]}
+
+  def put_path(%__MODULE__{} = request, path),
+    do: %__MODULE__{request | path: path}
 
   def parse_address(address) when is_binary(address) do
     address

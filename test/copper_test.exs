@@ -9,7 +9,9 @@ defmodule CopperTest do
   setup do
     {:ok, pid} = Client.start_link(address: @address)
     sync_request = %Request{}
-    async_request = %{sync_request | options: [controlling_process: self()]}
+    async_request =
+      sync_request
+      |> Request.put_option(:controlling_process, self())
     %{client: pid, async_request: async_request, sync_request: sync_request}
   end
 
@@ -18,7 +20,11 @@ defmodule CopperTest do
   end
 
   test "async head", %{client: client, async_request: async_request} do
-    assert :ok = Client.request(client, %{async_request | method: "HEAD"})
+    request =
+      async_request
+      |> Request.put_method("HEAD")
+
+    assert :ok = Client.request(client, request)
     receive_headers(1)
     receive_closed(1)
   end
@@ -31,15 +37,31 @@ defmodule CopperTest do
   end
 
   test "async post", %{client: client, async_request: async_request} do
-    assert :ok = Client.request(client, %{async_request | method: "POST", data: "data"})
+    request =
+      async_request
+      |> Request.put_method("POST")
+      |> Request.put_body("data")
+
+    assert :ok = Client.request(client, request)
     receive_headers(1)
     receive_data(1)
   end
 
-  test "async multiple async_requests", %{client: client, async_request: async_request} do
-    assert :ok = Client.request(client, %{async_request | method: "HEAD"})
+  test "async multiple streams", %{client: client, async_request: async_request} do
+    request =
+      async_request
+      |> Request.put_method("HEAD")
+
+    assert :ok = Client.request(client, request)
+
     assert :ok = Client.request(client, async_request)
-    assert :ok = Client.request(client, %{async_request | method: "POST", data: "data"})
+
+    request =
+      async_request
+      |> Request.put_method("POST")
+      |> Request.put_body("data")
+
+    assert :ok = Client.request(client, request)
 
     receive_headers(1)
     receive_closed(1)

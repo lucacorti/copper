@@ -3,5 +3,5 @@ defmodule Copper.Response do
   Copper Response
   """
   defstruct headers: [],
-            data: []
+            body: []
 end

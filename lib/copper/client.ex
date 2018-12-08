@@ -100,10 +100,10 @@ defmodule Copper.Client do
   end
 
   def handle_info({:ankh, :data, stream_id, data, _end_stream}, %{streams: streams} = state) do
-    with {to, %Response{data: res_data} = response} <- Map.get(streams, stream_id) do
+    with {to, %Response{body: body} = response} <- Map.get(streams, stream_id) do
       streams =
         streams
-        |> Map.put(stream_id, {to, %{response | data: [data | res_data]}})
+        |> Map.put(stream_id, {to, %{response | body: [data | body]}})
 
       {:noreply, %{state | streams: streams}}
     else
@@ -113,8 +113,8 @@ defmodule Copper.Client do
   end
 
   def handle_info({:ankh, :stream, stream_id, :closed}, %{streams: streams} = state) do
-    with {to, %Response{data: data} = response} <- Map.get(streams, stream_id) do
-      GenServer.reply(to, {:ok, %{response | data: Enum.reverse(data)}})
+    with {to, %Response{body: body} = response} <- Map.get(streams, stream_id) do
+      GenServer.reply(to, {:ok, %{response | body: Enum.reverse(body)}})
       {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
     else
       error ->
@@ -123,7 +123,7 @@ defmodule Copper.Client do
   end
 
   defp send_data(stream, request) do
-    case Request.data(request) do
+    case Request.data_frame(request) do
       nil ->
         :ok
 
@@ -138,7 +138,7 @@ defmodule Copper.Client do
   end
 
   defp send_headers(stream, request) do
-    with {:ok, _stream_state} <- Stream.send(stream, Request.headers(request)) do
+    with {:ok, _stream_state} <- Stream.send(stream, Request.headers_frame(request)) do
       :ok
     else
       error ->
