@@ -24,27 +24,10 @@ defmodule Copper.Request do
   def headers_frame(%__MODULE__{
         body: body,
         headers: headers,
-        method: "HEAD" = method,
+        method: method,
         path: path,
         uri: %URI{scheme: scheme, authority: authority}
-      }) do
-    headers =
-      [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
-      |> Enum.into(headers)
-
-    %Headers{
-      flags: %Headers.Flags{end_stream: body == nil},
-      payload: %Headers.Payload{hbf: headers}
-    }
-  end
-
-  def headers_frame(%__MODULE__{
-        body: body,
-        headers: headers,
-        method: "GET" = method,
-        path: path,
-        uri: %URI{scheme: scheme, authority: authority}
-      }) do
+      }) when method == "HEAD" or method == "GET" do
     headers =
       [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
       |> Enum.into(headers)
