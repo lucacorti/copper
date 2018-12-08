@@ -8,6 +8,7 @@ defmodule Copper.Supervisor do
   end
 
   def init([]) do
-    supervise([], strategy: :one_for_one)
+    []
+    |> Supervisor.init(strategy: :one_for_one)
   end
 end

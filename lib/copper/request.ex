@@ -13,6 +13,7 @@ defmodule Copper.Request do
             options: []
 
   def data(%__MODULE__{data: nil}), do: nil
+
   def data(%__MODULE__{data: data}) do
     %Data{
       flags: %Data.Flags{end_stream: true},
@@ -20,8 +21,14 @@ defmodule Copper.Request do
     }
   end
 
-  def headers(%__MODULE__{headers: headers, method: method, path: path, uri: %URI{scheme: scheme, authority: authority}}) do
-    headers = [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
+  def headers(%__MODULE__{
+        headers: headers,
+        method: method,
+        path: path,
+        uri: %URI{scheme: scheme, authority: authority}
+      }) do
+    headers =
+      [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
       |> Enum.into(headers)
 
     %Headers{

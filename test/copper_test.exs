@@ -1,5 +1,5 @@
 defmodule CopperTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Copper
 
   alias Copper.{Client, Request}
@@ -8,36 +8,64 @@ defmodule CopperTest do
 
   setup do
     {:ok, pid} = Client.start_link(address: @address)
-    %{client: pid}
+    sync_request = %Request{}
+    async_request = %{sync_request | options: [controlling_process: self()]}
+    %{client: pid, async_request: async_request, sync_request: sync_request}
   end
 
-  test "head", %{client: client} do
-    assert :ok = Client.request(client, %Request{method: "HEAD"})
-    assert_receive {:ankh, :headers, 1, _headers}, 1_000
+  test "sync get", %{client: client, sync_request: sync_request} do
+    assert {:ok, response} = Client.request(client, sync_request)
   end
 
-  test "get", %{client: client} do
-    assert :ok = Client.request(client, %Request{})
-    assert_receive {:ankh, :headers, _, _headers}, 1_000
-    assert_receive {:ankh, :data, _, _data, _end_stream}, 1_000
+  test "async head", %{client: client, async_request: async_request} do
+    assert :ok = Client.request(client, %{async_request | method: "HEAD"})
+    receive_headers(1)
+    receive_closed(1)
   end
 
-  test "post", %{client: client} do
-    assert :ok = Client.request(client, %Request{method: "POST", data: "data"})
-    assert_receive {:ankh, :headers, _, _headers}, 1_000
-    assert_receive {:ankh, :data, _, _data, _end_stream}, 1_000
+  test "async get", %{client: client, async_request: async_request} do
+    assert :ok = Client.request(client, async_request)
+    receive_headers(1)
+    receive_data(1)
+    receive_closed(1)
   end
 
-  test "multiple requests", %{client: client} do
-    assert :ok = Client.request(client, %Request{method: "HEAD"})
-    assert_receive {:ankh, :headers, 1, _headers}, 1_000
+  test "async post", %{client: client, async_request: async_request} do
+    assert :ok = Client.request(client, %{async_request | method: "POST", data: "data"})
+    receive_headers(1)
+    receive_data(1)
+  end
 
-    assert :ok = Client.request(client, %Request{})
-    assert_receive {:ankh, :headers, 3, _headers}, 1_000
-    assert_receive {:ankh, :data, 3, _data, _end_stream}, 1_000
+  test "async multiple async_requests", %{client: client, async_request: async_request} do
+    assert :ok = Client.request(client, %{async_request | method: "HEAD"})
+    assert :ok = Client.request(client, async_request)
+    assert :ok = Client.request(client, %{async_request | method: "POST", data: "data"})
 
-    assert :ok = Client.request(client, %Request{method: "POST", data: "data"})
-    assert_receive {:ankh, :headers, 5, _headers}, 1_000
-    assert_receive {:ankh, :data, 5, _data, _end_stream}, 1_000
+    receive_headers(1)
+    receive_closed(1)
+
+    receive_headers(3)
+    receive_data(3)
+    receive_closed(3)
+
+    receive_headers(5)
+    receive_data(5)
+    receive_closed(5)
+  end
+
+  defp receive_headers(stream_id) do
+    assert_receive {:ankh, :headers, ^stream_id, _headers}, 1_000
+  end
+
+  defp receive_data(stream_id) do
+    assert_receive {:ankh, :data, ^stream_id, _data, end_stream}, 1_000
+
+    unless end_stream do
+      receive_data(stream_id)
+    end
+  end
+
+  defp receive_closed(stream_id) do
+    assert_receive {:ankh, :stream, ^stream_id, :closed}, 1_000
   end
 end

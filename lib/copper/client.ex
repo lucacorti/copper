@@ -8,7 +8,7 @@ defmodule Copper.Client do
   require Logger
 
   alias Ankh.{Connection, Stream}
-  alias Copper.Request
+  alias Copper.{Request, Response}
 
   def start_link(args, options \\ []) do
     GenServer.start_link(__MODULE__, args, options)
@@ -19,43 +19,64 @@ defmodule Copper.Client do
 
     {:ok,
      %{
-       uri: %URI{Request.parse_address(address) | path: nil},
        connection: nil,
-       ssl_options: Keyword.get(args, :ssl_options, [])
+       streams: %{},
+       ssl_options: Keyword.get(args, :ssl_options, []),
+       uri: %URI{Request.parse_address(address) | path: nil}
      }}
   end
 
   def request(client, %Request{options: options} = request) do
-    options = [controlling_process: self()]
-    |> Keyword.merge(options)
-
-    GenServer.call(client, {:request, %{request | options: options}})
+    controlling_process = Keyword.get(options, :controlling_process)
+    GenServer.call(client, {:request, request, controlling_process})
   end
 
   def handle_call(
-        {:request, request},
+        {:request, request, controlling_process},
         from,
         %{
           connection: nil,
-          uri: uri,
+          uri: uri
         } = state
       ) do
     {:ok, connection} = Connection.start_link(uri: uri)
     :ok = Connection.connect(connection)
-    handle_call({:request, request}, from, %{state | connection: connection})
+    handle_call({:request, request, controlling_process}, from, %{state | connection: connection})
   end
 
   def handle_call(
-        {:request, %Request{options: options} = request},
-        _from,
+        {:request, %Request{options: options} = request, nil = _controlling_process},
+        from,
         %{
           connection: connection,
-          uri: uri,
+          streams: streams,
+          uri: uri
         } = state
       ) do
     request = %Request{request | uri: uri}
 
-    with {:ok, stream} <- Connection.start_stream(connection, options),
+    with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
+         :ok <- send_headers(stream, request),
+         :ok <- send_data(stream, request) do
+      {:noreply, %{state | streams: Map.put(streams, stream_id, {from, %Response{}})}}
+    else
+      error ->
+        {:reply, {:error, error}, state}
+    end
+  end
+
+  def handle_call(
+        {:request, %Request{options: options} = request, controlling_process},
+        _from,
+        %{
+          connection: connection,
+          uri: uri
+        } = state
+      )
+      when is_pid(controlling_process) do
+    request = %Request{request | uri: uri}
+
+    with {:ok, _stream_id, stream} <- Connection.start_stream(connection, options),
          :ok <- send_headers(stream, request),
          :ok <- send_data(stream, request) do
       {:reply, :ok, state}
@@ -65,13 +86,40 @@ defmodule Copper.Client do
     end
   end
 
-  def terminate(reason, %{connection: nil}) do
-    Logger.error("Connection terminate: #{reason}")
+  def handle_info({:ankh, :headers, stream_id, headers}, %{streams: streams} = state) do
+    with {to, response} <- Map.get(streams, stream_id) do
+      streams =
+        streams
+        |> Map.put(stream_id, {to, %{response | headers: headers}})
+
+      {:noreply, %{state | streams: streams}}
+    else
+      error ->
+        {:stop, error, error, state}
+    end
   end
 
-  def terminate(reason, %{connection: connection}) do
-    Logger.error("Connection terminate: #{reason}")
-    Connection.close(connection)
+  def handle_info({:ankh, :data, stream_id, data, _end_stream}, %{streams: streams} = state) do
+    with {to, %Response{data: res_data} = response} <- Map.get(streams, stream_id) do
+      streams =
+        streams
+        |> Map.put(stream_id, {to, %{response | data: [data | res_data]}})
+
+      {:noreply, %{state | streams: streams}}
+    else
+      error ->
+        {:stop, error, error, state}
+    end
+  end
+
+  def handle_info({:ankh, :stream, stream_id, :closed}, %{streams: streams} = state) do
+    with {to, %Response{data: data} = response} <- Map.get(streams, stream_id) do
+      GenServer.reply(to, {:ok, %{response | data: Enum.reverse(data)}})
+      {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
+    else
+      error ->
+        {:stop, error, error, state}
+    end
   end
 
   defp send_data(stream, request) do
@@ -86,7 +134,7 @@ defmodule Copper.Client do
           error ->
             {:error, error}
         end
-      end
+    end
   end
 
   defp send_headers(stream, request) do
