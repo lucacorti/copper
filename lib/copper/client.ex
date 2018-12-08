@@ -122,6 +122,18 @@ defmodule Copper.Client do
     end
   end
 
+  def handle_info({:ankh, :error, 0 = _stream_id, error}, state) do
+    {:stop, error, error, state}
+  end
+
+  def handle_info({:ankh, :error, stream_id, error}, %{streams: streams} = state) do
+    with {to, _response} <- Map.get(streams, stream_id) do
+      GenServer.reply(to, {:error, error})
+    end
+
+    {:stop, error, error, state}
+  end
+
   defp send_data(stream, request) do
     case Request.data_frame(request) do
       nil ->
