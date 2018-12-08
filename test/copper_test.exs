@@ -51,25 +51,20 @@ defmodule CopperTest do
     request =
       async_request
       |> Request.put_method("HEAD")
-
     assert :ok = Client.request(client, request)
+    receive_headers(1)
+    receive_closed(1)
 
     assert :ok = Client.request(client, async_request)
+    receive_headers(3)
+    receive_data(3)
+    receive_closed(3)
 
     request =
       async_request
       |> Request.put_method("POST")
       |> Request.put_body("data")
-
     assert :ok = Client.request(client, request)
-
-    receive_headers(1)
-    receive_closed(1)
-
-    receive_headers(3)
-    receive_data(3)
-    receive_closed(3)
-
     receive_headers(5)
     receive_data(5)
     receive_closed(5)
