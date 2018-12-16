@@ -52,7 +52,8 @@ defmodule Copper.Request do
         path: path,
         trailers: trailers,
         uri: %URI{scheme: scheme, authority: authority}
-      }) when method == "HEAD" or method == "GET" do
+      })
+      when method == "HEAD" or method == "GET" do
     headers =
       [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
       |> Enum.into(headers)
@@ -84,7 +85,7 @@ defmodule Copper.Request do
   def data_frame(%__MODULE__{
         body: body,
         trailers: trailers
-    }) do
+      }) do
     %Data{
       flags: %Data.Flags{end_stream: List.first(trailers) == nil},
       payload: %Data.Payload{data: body}

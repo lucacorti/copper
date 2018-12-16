@@ -39,9 +39,13 @@ defmodule Copper.Client do
           uri: uri
         } = state
       ) do
-    {:ok, connection} = Connection.start_link(uri: uri)
-    :ok = Connection.connect(connection)
-    handle_call({:request, request, controlling_process}, from, %{state | connection: connection})
+    with {:ok, connection} <- Connection.start_link(uri: uri),
+         :ok <- Connection.connect(connection) do
+      handle_call({:request, request, controlling_process}, from, %{
+        state
+        | connection: connection
+      })
+    end
   end
 
   def handle_call(
