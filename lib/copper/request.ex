@@ -52,38 +52,13 @@ defmodule Copper.Request do
         path: path,
         trailers: trailers,
         uri: %URI{scheme: scheme, authority: authority}
-      })
-      when method == "HEAD" or method == "GET" do
+      }) do
     headers =
       [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
       |> Enum.into(headers)
 
     %Headers{
       flags: %Headers.Flags{end_stream: body == nil && List.first(trailers) == nil},
-      payload: %Headers.Payload{hbf: headers}
-    }
-  end
-
-  def headers_frame(%__MODULE__{
-        headers: headers,
-        method: method,
-        path: path,
-        trailers: _trailers,
-        uri: %URI{scheme: scheme, authority: authority}
-      }) do
-    {:ok, version} = :application.get_key(:copper, :vsn)
-
-    headers =
-      [
-        {":method", method},
-        {":scheme", scheme},
-        {":authority", authority},
-        {":path", path},
-        {"user-agent", "Copper/#{List.to_string(version)}"}
-      ]
-      |> Enum.into(headers)
-
-    %Headers{
       payload: %Headers.Payload{hbf: headers}
     }
   end
