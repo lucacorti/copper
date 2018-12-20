@@ -165,13 +165,13 @@ defmodule Copper.Client do
   end
 
   defp headers_frame(%Request{
-        body: body,
-        headers: headers,
-        method: method,
-        path: path,
-        trailers: trailers,
-        uri: %URI{scheme: scheme, authority: authority}
-      }) do
+         body: body,
+         headers: headers,
+         method: method,
+         path: path,
+         trailers: trailers,
+         uri: %URI{scheme: scheme, authority: authority}
+       }) do
     headers =
       [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
       |> Enum.into(headers)
@@ -185,9 +185,9 @@ defmodule Copper.Client do
   defp data_frame(%Request{body: nil}), do: nil
 
   defp data_frame(%Request{
-        body: body,
-        trailers: trailers
-      }) do
+         body: body,
+         trailers: trailers
+       }) do
     %Data{
       flags: %Data.Flags{end_stream: List.first(trailers) == nil},
       payload: %Data.Payload{data: body}
@@ -197,8 +197,8 @@ defmodule Copper.Client do
   defp trailers_frame(%Request{trailers: []}), do: nil
 
   defp trailers_frame(%Request{
-        trailers: trailers
-      }) do
+         trailers: trailers
+       }) do
     %Headers{
       flags: %Headers.Flags{end_stream: true},
       payload: %Headers.Payload{hbf: trailers}
