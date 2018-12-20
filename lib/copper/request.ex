@@ -71,8 +71,15 @@ defmodule Copper.Request do
         trailers: _trailers,
         uri: %URI{scheme: scheme, authority: authority}
       }) do
-    headers =
-      [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
+      {:ok, version} = :application.get_key(:copper, :vsn)
+      headers =
+      [
+        {":method", method},
+        {":scheme", scheme},
+        {":authority", authority},
+        {":path", path},
+        {"user-agent", "Copper/#{List.to_string(version)}"}
+      ]
       |> Enum.into(headers)
 
     %Headers{
