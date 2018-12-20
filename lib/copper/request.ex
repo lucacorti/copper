@@ -24,11 +24,11 @@ defmodule Copper.Request do
 
   @spec put_header(%__MODULE__{}, header_name, header_value) :: %__MODULE__{}
   def put_header(%__MODULE__{headers: headers} = request, header, value),
-    do: %__MODULE__{request | headers: [{header, value} | headers]}
+    do: %__MODULE__{request | headers: [{String.downcase(header), value} | headers]}
 
   @spec put_trailer(%__MODULE__{}, header_name, header_value) :: %__MODULE__{}
   def put_trailer(%__MODULE__{trailers: trailers} = request, trailer, value),
-    do: %__MODULE__{request | trailers: [{trailer, value} | trailers]}
+    do: %__MODULE__{request | trailers: [{String.downcase(trailer), value} | trailers]}
 
   @spec put_method(%__MODULE__{}, String.t()) :: %__MODULE__{}
   def put_method(%__MODULE__{} = request, method),
