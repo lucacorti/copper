@@ -6,8 +6,8 @@ defmodule Copper.Response do
             headers: [],
             trailers: []
 
-  @type header_name :: String.t
-  @type header_value :: String.t
+  @type header_name :: String.t()
+  @type header_value :: String.t()
 
   @content_length "content-length"
   @content_type "content-type"
@@ -16,35 +16,40 @@ defmodule Copper.Response do
 
   @spec content_length!(%__MODULE__{}) :: header_value
   def content_length!(%__MODULE__{} = response),
-    do: response
-          |> find_header!(@content_length)
+    do:
+      response
+      |> find_header!(@content_length)
 
   @spec content_type!(%__MODULE__{}) :: header_value
   def content_type!(%__MODULE__{} = response),
-    do: response
-          |> find_header!(@content_type)
+    do:
+      response
+      |> find_header!(@content_type)
 
   @spec date!(%__MODULE__{}) :: header_value
   def date!(%__MODULE__{} = response),
-    do: response
-          |> find_header!(@date)
+    do:
+      response
+      |> find_header!(@date)
 
   @spec status!(%__MODULE__{}) :: header_value
   def status!(%__MODULE__{} = response),
-    do: response
-          |> find_header!(@status)
+    do:
+      response
+      |> find_header!(@status)
 
   @spec find_header!(%__MODULE__{}, header_name) :: header_value
   def find_header!(%__MODULE__{} = response, name),
-    do: response
-          |> find_headers(name)
-          |> hd()
+    do:
+      response
+      |> find_headers(name)
+      |> hd()
 
   @spec find_header(%__MODULE__{}, header_name) :: header_value
   def find_header(%__MODULE__{} = response, name) do
     try do
       response
-        |> find_header!(name)
+      |> find_header!(name)
     rescue
       _ ->
         nil

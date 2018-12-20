@@ -71,8 +71,9 @@ defmodule Copper.Request do
         trailers: _trailers,
         uri: %URI{scheme: scheme, authority: authority}
       }) do
-      {:ok, version} = :application.get_key(:copper, :vsn)
-      headers =
+    {:ok, version} = :application.get_key(:copper, :vsn)
+
+    headers =
       [
         {":method", method},
         {":scheme", scheme},
