@@ -49,7 +49,7 @@ defmodule Copper.Client do
   end
 
   def handle_call(
-        {:request, %Request{options: options} = request, nil = _controlling_process},
+        {:request, %Request{options: options} = request, controlling_process},
         from,
         %{
           connection: connection,
@@ -63,32 +63,13 @@ defmodule Copper.Client do
 
     with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
          :ok <- send_headers(stream, request),
-         :ok <- send_data(stream, request) do
-      {:noreply, %{state | streams: Map.put(streams, stream_id, {from, %Response{}})}}
-    else
-      error ->
-        {:reply, {:error, error}, state}
-    end
-  end
-
-  def handle_call(
-        {:request, %Request{options: options} = request, controlling_process},
-        _from,
-        %{
-          connection: connection,
-          uri: uri
-        } = state
-      )
-      when is_pid(controlling_process) do
-    request =
-      request
-      |> Request.put_uri(uri)
-
-    with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
-         :ok <- send_headers(stream, request),
          :ok <- send_data(stream, request),
          :ok <- send_trailers(stream, request) do
-      {:reply, {:ok, stream_id}, state}
+      if controlling_process == nil do
+        {:noreply, %{state | streams: Map.put(streams, stream_id, {from, %Response{}})}}
+      else
+        {:reply, {:ok, stream_id}, state}
+      end
     else
       error ->
         {:reply, {:error, error}, state}
