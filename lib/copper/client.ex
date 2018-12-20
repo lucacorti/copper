@@ -8,6 +8,7 @@ defmodule Copper.Client do
   require Logger
 
   alias Ankh.{Connection, Stream}
+  alias Ankh.Frame.{Data, Headers}
   alias Copper.{Request, Response}
 
   def start_link(args, options \\ []) do
@@ -22,7 +23,7 @@ defmodule Copper.Client do
        connection: nil,
        streams: %{},
        ssl_options: Keyword.get(args, :ssl_options, []),
-       uri: Request.parse_address(address)
+       uri: parse_address(address)
      }}
   end
 
@@ -125,7 +126,7 @@ defmodule Copper.Client do
   end
 
   defp send_data(stream, request) do
-    case Request.data_frame(request) do
+    case data_frame(request) do
       nil ->
         :ok
 
@@ -140,7 +141,7 @@ defmodule Copper.Client do
   end
 
   defp send_headers(stream, request) do
-    with {:ok, _stream_state} <- Stream.send(stream, Request.headers_frame(request)) do
+    with {:ok, _stream_state} <- Stream.send(stream, headers_frame(request)) do
       :ok
     else
       error ->
@@ -149,7 +150,7 @@ defmodule Copper.Client do
   end
 
   defp send_trailers(stream, request) do
-    case Request.trailers_frame(request) do
+    case trailers_frame(request) do
       nil ->
         :ok
 
@@ -162,4 +163,56 @@ defmodule Copper.Client do
         end
     end
   end
+
+  defp headers_frame(%Request{
+        body: body,
+        headers: headers,
+        method: method,
+        path: path,
+        trailers: trailers,
+        uri: %URI{scheme: scheme, authority: authority}
+      }) do
+    headers =
+      [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
+      |> Enum.into(headers)
+
+    %Headers{
+      flags: %Headers.Flags{end_stream: body == nil && List.first(trailers) == nil},
+      payload: %Headers.Payload{hbf: headers}
+    }
+  end
+
+  defp data_frame(%Request{body: nil}), do: nil
+
+  defp data_frame(%Request{
+        body: body,
+        trailers: trailers
+      }) do
+    %Data{
+      flags: %Data.Flags{end_stream: List.first(trailers) == nil},
+      payload: %Data.Payload{data: body}
+    }
+  end
+
+  defp trailers_frame(%Request{trailers: []}), do: nil
+
+  defp trailers_frame(%Request{
+        trailers: trailers
+      }) do
+    %Headers{
+      flags: %Headers.Flags{end_stream: true},
+      payload: %Headers.Payload{hbf: trailers}
+    }
+  end
+
+  defp parse_address(address) when is_binary(address) do
+    address
+    |> URI.parse()
+    |> parse_address
+  end
+
+  defp parse_address(%URI{scheme: nil}), do: raise("No scheme present in address")
+  defp parse_address(%URI{scheme: "http"}), do: raise("Plaintext HTTP is not supported")
+  defp parse_address(%URI{host: nil}), do: raise("No hostname present in address")
+  defp parse_address(%URI{} = uri), do: %{uri | path: nil}
 end

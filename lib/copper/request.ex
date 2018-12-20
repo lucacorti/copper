@@ -3,8 +3,6 @@ defmodule Copper.Request do
   Copper Request
   """
 
-  alias Ankh.Frame.{Data, Headers}
-
   defstruct uri: nil,
             method: "GET",
             path: "/",
@@ -33,56 +31,4 @@ defmodule Copper.Request do
 
   def put_path(%__MODULE__{} = request, path),
     do: %__MODULE__{request | path: path}
-
-  def parse_address(address) when is_binary(address) do
-    address
-    |> URI.parse()
-    |> parse_address
-  end
-
-  def parse_address(%URI{scheme: nil}), do: raise("No scheme present in address")
-  def parse_address(%URI{scheme: "http"}), do: raise("Plaintext HTTP is not supported")
-  def parse_address(%URI{host: nil}), do: raise("No hostname present in address")
-  def parse_address(%URI{} = uri), do: %{uri | path: nil}
-
-  def headers_frame(%__MODULE__{
-        body: body,
-        headers: headers,
-        method: method,
-        path: path,
-        trailers: trailers,
-        uri: %URI{scheme: scheme, authority: authority}
-      }) do
-    headers =
-      [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
-      |> Enum.into(headers)
-
-    %Headers{
-      flags: %Headers.Flags{end_stream: body == nil && List.first(trailers) == nil},
-      payload: %Headers.Payload{hbf: headers}
-    }
-  end
-
-  def data_frame(%__MODULE__{body: nil}), do: nil
-
-  def data_frame(%__MODULE__{
-        body: body,
-        trailers: trailers
-      }) do
-    %Data{
-      flags: %Data.Flags{end_stream: List.first(trailers) == nil},
-      payload: %Data.Payload{data: body}
-    }
-  end
-
-  def trailers_frame(%__MODULE__{trailers: []}), do: nil
-
-  def trailers_frame(%__MODULE__{
-        trailers: trailers
-      }) do
-    %Headers{
-      flags: %Headers.Flags{end_stream: true},
-      payload: %Headers.Payload{hbf: trailers}
-    }
-  end
 end
