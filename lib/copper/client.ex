@@ -57,7 +57,9 @@ defmodule Copper.Client do
           uri: uri
         } = state
       ) do
-    request = %Request{request | uri: uri}
+    request =
+      request
+      |> Request.put_uri(uri)
 
     with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
          :ok <- send_headers(stream, request),
