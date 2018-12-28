@@ -92,7 +92,7 @@ defmodule Copper.Client do
       end
     else
       error ->
-        {:stop, error, error, state}
+        {:stop, error, state}
     end
   end
 
@@ -110,12 +110,8 @@ defmodule Copper.Client do
       end
     else
       error ->
-        {:stop, error, error, state}
+        {:stop, error, state}
     end
-  end
-
-  def handle_info({:ankh, :error, 0 = _stream_id, error}, state) do
-    {:stop, error, error, state}
   end
 
   def handle_info({:ankh, :error, stream_id, error}, %{streams: streams} = state) do
@@ -123,7 +119,7 @@ defmodule Copper.Client do
       GenServer.reply(to, {:error, error})
     end
 
-    {:stop, error, error, state}
+    {:stop, error, state}
   end
 
   defp send_data(stream, request) do
