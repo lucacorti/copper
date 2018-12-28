@@ -50,7 +50,7 @@ defmodule Copper.Client do
   end
 
   def handle_call(
-        {:request, %Request{options: options} = request, controlling_process},
+        {:request, request, controlling_process},
         from,
         %{
           connection: connection,
@@ -62,7 +62,7 @@ defmodule Copper.Client do
       request
       |> Request.put_uri(uri)
 
-    with {:ok, stream_id, stream} <- Connection.start_stream(connection, options),
+    with {:ok, stream_id, stream} <- Connection.start_stream(connection, nil, controlling_process),
          :ok <- send_headers(stream, request),
          :ok <- send_data(stream, request),
          :ok <- send_trailers(stream, request) do
