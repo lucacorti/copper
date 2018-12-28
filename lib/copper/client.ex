@@ -62,7 +62,8 @@ defmodule Copper.Client do
       request
       |> Request.put_uri(uri)
 
-    with {:ok, stream_id, stream} <- Connection.start_stream(connection, nil, controlling_process),
+    with {:ok, stream_id, stream} <-
+           Connection.start_stream(connection, nil, controlling_process),
          :ok <- send_headers(stream, request),
          :ok <- send_data(stream, request),
          :ok <- send_trailers(stream, request) do
@@ -77,36 +78,36 @@ defmodule Copper.Client do
     end
   end
 
-  def handle_info({:ankh, :headers, stream_id, headers}, %{streams: streams} = state) do
+  def handle_info({:ankh, :headers, stream_id, headers, end_stream}, %{streams: streams} = state) do
     with {to, response} <- Map.get(streams, stream_id) do
-      streams =
-        streams
-        |> Map.put(stream_id, {to, %{response | headers: headers}})
+      if end_stream do
+        GenServer.reply(to, {:ok, %{response | headers: headers}})
+        {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
+      else
+        streams =
+          streams
+          |> Map.put(stream_id, {to, %{response | headers: headers}})
 
-      {:noreply, %{state | streams: streams}}
+        {:noreply, %{state | streams: streams}}
+      end
     else
       error ->
         {:stop, error, error, state}
     end
   end
 
-  def handle_info({:ankh, :data, stream_id, data, _end_stream}, %{streams: streams} = state) do
+  def handle_info({:ankh, :data, stream_id, data, end_stream}, %{streams: streams} = state) do
     with {to, %Response{body: body} = response} <- Map.get(streams, stream_id) do
-      streams =
-        streams
-        |> Map.put(stream_id, {to, %{response | body: [data | body]}})
+      if end_stream do
+        GenServer.reply(to, {:ok, %{response | body: Enum.reverse([data | body])}})
+        {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
+      else
+        streams =
+          streams
+          |> Map.put(stream_id, {to, %{response | body: [data | body]}})
 
-      {:noreply, %{state | streams: streams}}
-    else
-      error ->
-        {:stop, error, error, state}
-    end
-  end
-
-  def handle_info({:ankh, :stream, stream_id, :closed}, %{streams: streams} = state) do
-    with {to, %Response{body: body} = response} <- Map.get(streams, stream_id) do
-      GenServer.reply(to, {:ok, %{response | body: Enum.reverse(body)}})
-      {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
+        {:noreply, %{state | streams: streams}}
+      end
     else
       error ->
         {:stop, error, error, state}

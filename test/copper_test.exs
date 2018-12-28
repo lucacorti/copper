@@ -27,15 +27,12 @@ defmodule CopperTest do
       |> Request.put_method("HEAD")
 
     assert {:ok, stream_id} = Client.request(client, request)
-    receive_headers(stream_id)
-    receive_closed(stream_id)
+    receive_all(stream_id)
   end
 
   test "async get", %{client: client, async_request: async_request} do
     assert {:ok, stream_id} = Client.request(client, async_request)
-    receive_headers(stream_id)
-    receive_data(stream_id)
-    receive_closed(stream_id)
+    receive_all(stream_id)
   end
 
   test "async post", %{client: client, async_request: async_request} do
@@ -45,8 +42,7 @@ defmodule CopperTest do
       |> Request.put_body("data")
 
     assert {:ok, stream_id} = Client.request(client, request)
-    receive_headers(stream_id)
-    receive_data(stream_id)
+    receive_all(stream_id)
   end
 
   test "async multiple streams", %{client: client, async_request: async_request} do
@@ -55,13 +51,10 @@ defmodule CopperTest do
       |> Request.put_method("HEAD")
 
     assert {:ok, stream_id} = Client.request(client, request)
-    receive_headers(stream_id)
-    receive_closed(stream_id)
+    receive_all(stream_id)
 
     assert {:ok, stream_id} = Client.request(client, async_request)
-    receive_headers(stream_id)
-    receive_data(stream_id)
-    receive_closed(stream_id)
+    receive_all(stream_id)
 
     request =
       async_request
@@ -69,13 +62,18 @@ defmodule CopperTest do
       |> Request.put_body("data")
 
     assert {:ok, stream_id} = Client.request(client, request)
-    receive_headers(stream_id)
-    receive_data(stream_id)
-    receive_closed(stream_id)
+    receive_all(stream_id)
+  end
+
+  defp receive_all(stream_id) do
+    unless receive_headers(stream_id) do
+      receive_data(stream_id)
+    end
   end
 
   defp receive_headers(stream_id) do
-    assert_receive {:ankh, :headers, ^stream_id, _headers}, 1_000
+    assert_receive {:ankh, :headers, ^stream_id, _headers, end_stream}, 1_000
+    end_stream
   end
 
   defp receive_data(stream_id) do
@@ -84,9 +82,5 @@ defmodule CopperTest do
     unless end_stream do
       receive_data(stream_id)
     end
-  end
-
-  defp receive_closed(stream_id) do
-    assert_receive {:ankh, :stream, ^stream_id, :closed}, 1_000
   end
 end
