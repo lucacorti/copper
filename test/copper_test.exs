@@ -2,85 +2,19 @@ defmodule CopperTest do
   use ExUnit.Case, async: true
   doctest Copper
 
-  alias Copper.{Client, Request}
+  alias Ankh.HTTP.Request
+  alias Copper.Client
 
-  @address "https://www.google.com"
+  @uri URI.parse("https://www.google.com")
 
-  setup do
-    {:ok, pid} = Client.start_link(address: @address)
-    sync_request = %Request{}
-
-    async_request =
-      sync_request
-      |> Request.put_option(:controlling_process, self())
-
-    %{client: pid, async_request: async_request, sync_request: sync_request}
+  test "sync get" do
+    assert client = Client.new(@uri)
+    assert {:ok, client, response} = Client.request(client, %Request{})
   end
 
-  test "sync get", %{client: client, sync_request: sync_request} do
-    assert {:ok, response} = Client.request(client, sync_request)
-  end
-
-  test "async head", %{client: client, async_request: async_request} do
-    request =
-      async_request
-      |> Request.put_method("HEAD")
-
-    assert {:ok, stream_id} = Client.request(client, request)
-    receive_all(stream_id)
-  end
-
-  test "async get", %{client: client, async_request: async_request} do
-    assert {:ok, stream_id} = Client.request(client, async_request)
-    receive_all(stream_id)
-  end
-
-  test "async post", %{client: client, async_request: async_request} do
-    request =
-      async_request
-      |> Request.put_method("POST")
-      |> Request.put_body("data")
-
-    assert {:ok, stream_id} = Client.request(client, request)
-    receive_all(stream_id)
-  end
-
-  test "async multiple streams", %{client: client, async_request: async_request} do
-    request =
-      async_request
-      |> Request.put_method("HEAD")
-
-    assert {:ok, stream_id} = Client.request(client, request)
-    receive_all(stream_id)
-
-    assert {:ok, stream_id} = Client.request(client, async_request)
-    receive_all(stream_id)
-
-    request =
-      async_request
-      |> Request.put_method("POST")
-      |> Request.put_body("data")
-
-    assert {:ok, stream_id} = Client.request(client, request)
-    receive_all(stream_id)
-  end
-
-  defp receive_all(stream_id) do
-    unless receive_headers(stream_id) do
-      receive_data(stream_id)
-    end
-  end
-
-  defp receive_headers(stream_id) do
-    assert_receive {:ankh, :headers, ^stream_id, _headers, end_stream}, 1_000
-    end_stream
-  end
-
-  defp receive_data(stream_id) do
-    assert_receive {:ankh, :data, ^stream_id, _data, end_stream}, 1_000
-
-    unless end_stream do
-      receive_data(stream_id)
-    end
+  test "async get" do
+    assert client = Client.new(@uri)
+    assert {:ok, client, reference} = Client.async(client, %Request{})
+    assert {:ok, client, response} = Client.await(client, reference)
   end
 end

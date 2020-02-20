@@ -1,225 +1,120 @@
 defmodule Copper.Client do
   @moduledoc """
-  Copper Client
+  HTTP Client
   """
 
-  use GenServer
+  alias Ankh.HTTP
+  alias HTTP.{Request, Response}
 
-  require Logger
+  @type options :: keyword()
 
-  alias Ankh.{Connection, Stream}
-  alias Ankh.Frame.{Data, Headers}
-  alias Copper.{Request, Response}
+  @opaque t :: %__MODULE__{protocol: nil}
+  defstruct protocol: nil,
+            uri: nil
 
-  def start_link(args, options \\ []) do
-    GenServer.start_link(__MODULE__, args, options)
-  end
+  @doc """
+  Returns a new Http struct.
+  """
+  @spec new(URI.t()) :: t
+  def new(address), do: %__MODULE__{uri: URI.parse(address)}
 
-  def init(args) do
-    {:ok, address} = Keyword.fetch(args, :address)
+  @doc """
+  Performs an HTTP request
 
-    {:ok,
-     %{
-       connection: nil,
-       streams: %{},
-       ssl_options: Keyword.get(args, :ssl_options, []),
-       uri: parse_address(address)
-     }}
-  end
+  Returns the client stucture to use for subsequent requests.
+  """
+  @spec request(t, Request.t(), options) :: {:ok, t, Response.t()} | {:error, term}
+  def request(client, request, options \\ [])
 
-  def request(client, %Request{options: options} = request) do
-    controlling_process = Keyword.get(options, :controlling_process)
-    GenServer.call(client, {:request, request, controlling_process})
-  end
-
-  def handle_call(
-        {:request, request, controlling_process},
-        from,
-        %{
-          connection: nil,
-          uri: uri
-        } = state
-      ) do
-    with {:ok, connection} <- Connection.start_link(uri),
-         :ok <- Connection.connect(connection) do
-      handle_call({:request, request, controlling_process}, from, %{
-        state
-        | connection: connection
-      })
+  def request(%__MODULE__{protocol: nil, uri: uri} = client, request, options) do
+    with {:ok, protocol} <- Ankh.HTTP.connect(uri, options) do
+      request(%__MODULE__{client | protocol: protocol}, request)
     end
   end
 
-  def handle_call(
-        {:request, request, controlling_process},
-        from,
-        %{
-          connection: connection,
-          streams: streams,
-          uri: uri
-        } = state
-      ) do
-    request =
-      request
-      |> Request.put_uri(uri)
+  def request(%__MODULE__{protocol: protocol} = client, request, _options) do
+    request = Request.put_header(request, "user-aget", "copper/1.0")
+    with {:ok, protocol, reference} <- Ankh.HTTP.request(protocol, request),
+         {:ok, protocol, response} <- await(%{client | protocol: protocol}, reference) do
+      {:ok, %{client | protocol: protocol}, response}
+    end
+  end
 
-    with {:ok, stream_id, stream} <-
-           Connection.start_stream(connection, nil, controlling_process),
-         :ok <- send_headers(stream, request),
-         :ok <- send_data(stream, request),
-         :ok <- send_trailers(stream, request) do
-      if controlling_process == nil do
-        {:noreply, %{state | streams: Map.put(streams, stream_id, {from, %Response{}})}}
-      else
-        {:reply, {:ok, stream_id}, state}
-      end
+  @doc """
+  Performs an asynchronous HTTP request
+
+  Returns the request reference to be used with `await/2`.
+  """
+  @spec async(t, Request.t(), options) :: {:ok, t, reference} | {:error, term}
+  def async(client, request, options \\ [])
+
+  def async(%__MODULE__{protocol: nil, uri: uri} = client, request, options) do
+    with {:ok, protocol} <- Ankh.HTTP.connect(uri, options) do
+      async(%__MODULE__{client | protocol: protocol}, request)
+    end
+  end
+
+  def async(%__MODULE__{protocol: protocol} = client, request, _options) do
+    request = Request.put_header(request, "user-aget", "copper/1.0")
+    with {:ok, protocol, reference} <- Ankh.HTTP.request(protocol, request) do
+      {:ok, %{client | protocol: protocol}, reference}
+    end
+  end
+
+  @doc """
+  Returns a response for an asynchronous HTTP request
+
+  Returns the client stucture to use for subsequent requests.
+  """
+  @spec await(t(), reference) :: {:ok, t(), Response.t()} | {:error, any}
+  def await(%{protocol: protocol} = client, reference) do
+    with {:ok, protocol, response} <- receive_msg(protocol, %Response{}, reference) do
+      {:ok, %{client | protocol: protocol}, response}
+    end
+  end
+
+  defp receive_msg(protocol, response, request_ref) do
+    receive do
+      msg ->
+        handle_msg(protocol, request_ref, msg, response)
+
+      after 5_000 ->
+        {:error, :timeout}
+    end
+  end
+
+  defp handle_msg(protocol, request_ref, msg, response) do
+    with {:ok, protocol, responses} <- Ankh.HTTP.stream(protocol, msg),
+         {:ok, protocol, {response, true}} <-
+           handle_responses(protocol, response, responses, request_ref) do
+      {:ok, protocol, response}
     else
-      error ->
-        {:reply, {:error, error}, state}
+      :unknown ->
+        receive_msg(protocol, response, request_ref)
+
+      {:error, reason} ->
+        {:error, reason}
+
+      {:ok, protocol, {response, false}} ->
+        receive_msg(protocol, response, request_ref)
     end
   end
 
-  def handle_info({:ankh, :headers, stream_id, headers, true = _end_stream}, %{streams: streams} = state) do
-    with {to, response} <- Map.get(streams, stream_id) do
-      GenServer.reply(to, {:ok, %{response | headers: headers}})
-      {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
-    else
-      error ->
-        {:stop, error, state}
-    end
+  defp handle_responses(protocol, response, responses, request_ref) do
+    {response, complete} =
+      responses
+      |> Enum.reduce({response, false}, fn
+        {:data, ^request_ref, data, complete}, {%Response{body: body} = response, _complete} ->
+          body = if is_nil(body), do: [data], else: [data | body]
+          {%Response{response | body: body}, complete}
+
+        {:headers, ^request_ref, v, complete}, {response, _complete} ->
+          {%Response{response | headers: v}, complete}
+
+        {:error, ^request_ref, reason, complete}, {_response, _complete} ->
+          {{:error, reason}, complete}
+      end)
+
+    {:ok, protocol, {response, complete}}
   end
-
-  def handle_info({:ankh, :headers, stream_id, headers, false = _end_stream}, %{streams: streams} = state) do
-    with {to, response} <- Map.get(streams, stream_id) do
-      streams =
-        streams
-        |> Map.put(stream_id, {to, %{response | headers: headers}})
-
-      {:noreply, %{state | streams: streams}}
-    else
-      error ->
-        {:stop, error, state}
-    end
-  end
-
-  def handle_info({:ankh, :data, stream_id, data, true = _end_stream}, %{streams: streams} = state) do
-    with {to, %Response{body: body} = response} <- Map.get(streams, stream_id) do
-      GenServer.reply(to, {:ok, %{response | body: Enum.reverse([data | body])}})
-      {:noreply, %{state | streams: Map.delete(streams, stream_id)}}
-    else
-      error ->
-        {:stop, error, state}
-    end
-  end
-
-  def handle_info({:ankh, :data, stream_id, data, false = _end_stream}, %{streams: streams} = state) do
-    with {to, %Response{body: body} = response} <- Map.get(streams, stream_id) do
-      streams =
-        streams
-        |> Map.put(stream_id, {to, %{response | body: [data | body]}})
-
-      {:noreply, %{state | streams: streams}}
-    else
-      error ->
-        {:stop, error, state}
-    end
-  end
-
-  def handle_info({:ankh, :error, stream_id, error}, %{streams: streams} = state) do
-    with {to, _response} <- Map.get(streams, stream_id) do
-      GenServer.reply(to, {:error, error})
-    end
-
-    {:stop, error, state}
-  end
-
-  defp send_data(stream, request) do
-    case data_frame(request) do
-      nil ->
-        :ok
-
-      data ->
-        with {:ok, _stream_state} <- Stream.send(stream, data) do
-          :ok
-        else
-          error ->
-            {:error, error}
-        end
-    end
-  end
-
-  defp send_headers(stream, request) do
-    with {:ok, _stream_state} <- Stream.send(stream, headers_frame(request)) do
-      :ok
-    else
-      error ->
-        {:error, error}
-    end
-  end
-
-  defp send_trailers(stream, request) do
-    case trailers_frame(request) do
-      nil ->
-        :ok
-
-      trailers ->
-        with {:ok, _stream_state} <- Stream.send(stream, trailers) do
-          :ok
-        else
-          error ->
-            {:error, error}
-        end
-    end
-  end
-
-  defp headers_frame(%Request{
-         body: body,
-         headers: headers,
-         method: method,
-         path: path,
-         trailers: trailers,
-         uri: %URI{scheme: scheme, authority: authority}
-       }) do
-    headers =
-      [{":method", method}, {":scheme", scheme}, {":authority", authority}, {":path", path}]
-      |> Enum.into(headers)
-
-    %Headers{
-      flags: %Headers.Flags{end_stream: body == nil && List.first(trailers) == nil},
-      payload: %Headers.Payload{hbf: headers}
-    }
-  end
-
-  defp data_frame(%Request{body: nil}), do: nil
-
-  defp data_frame(%Request{
-         body: body,
-         trailers: trailers
-       }) do
-    %Data{
-      flags: %Data.Flags{end_stream: List.first(trailers) == nil},
-      payload: %Data.Payload{data: body}
-    }
-  end
-
-  defp trailers_frame(%Request{trailers: []}), do: nil
-
-  defp trailers_frame(%Request{
-         trailers: trailers
-       }) do
-    %Headers{
-      flags: %Headers.Flags{end_stream: true},
-      payload: %Headers.Payload{hbf: trailers}
-    }
-  end
-
-  defp parse_address(address) when is_binary(address) do
-    address
-    |> URI.parse()
-    |> parse_address
-  end
-
-  defp parse_address(%URI{scheme: nil}), do: raise("No scheme present in address")
-  defp parse_address(%URI{scheme: "http"}), do: raise("Plaintext HTTP is not supported")
-  defp parse_address(%URI{host: nil}), do: raise("No hostname present in address")
-  defp parse_address(%URI{} = uri), do: %{uri | path: nil}
 end
