@@ -27,14 +27,14 @@ defmodule Copper.Client do
   def request(client, request, options \\ [])
 
   def request(%__MODULE__{protocol: nil, uri: uri} = client, request, options) do
-    with {:ok, protocol} <- Ankh.HTTP.connect(uri, options) do
+    with {:ok, protocol} <- HTTP.connect(uri, options) do
       request(%__MODULE__{client | protocol: protocol}, request)
     end
   end
 
   def request(%__MODULE__{protocol: protocol} = client, request, _options) do
     request = Request.put_header(request, "user-aget", "copper/1.0")
-    with {:ok, protocol, reference} <- Ankh.HTTP.request(protocol, request),
+    with {:ok, protocol, reference} <- HTTP.request(protocol, request),
          {:ok, protocol, response} <- await(%{client | protocol: protocol}, reference) do
       {:ok, %{client | protocol: protocol}, response}
     end
@@ -49,14 +49,14 @@ defmodule Copper.Client do
   def async(client, request, options \\ [])
 
   def async(%__MODULE__{protocol: nil, uri: uri} = client, request, options) do
-    with {:ok, protocol} <- Ankh.HTTP.connect(uri, options) do
+    with {:ok, protocol} <- HTTP.connect(uri, options) do
       async(%__MODULE__{client | protocol: protocol}, request)
     end
   end
 
   def async(%__MODULE__{protocol: protocol} = client, request, _options) do
     request = Request.put_header(request, "user-aget", "copper/1.0")
-    with {:ok, protocol, reference} <- Ankh.HTTP.request(protocol, request) do
+    with {:ok, protocol, reference} <- HTTP.request(protocol, request) do
       {:ok, %{client | protocol: protocol}, reference}
     end
   end
@@ -84,7 +84,7 @@ defmodule Copper.Client do
   end
 
   defp handle_msg(protocol, request_ref, msg, response) do
-    with {:ok, protocol, responses} <- Ankh.HTTP.stream(protocol, msg),
+    with {:ok, protocol, responses} <- HTTP.stream(protocol, msg),
          {:ok, protocol, {response, true}} <-
            handle_responses(protocol, response, responses, request_ref) do
       {:ok, protocol, response}
