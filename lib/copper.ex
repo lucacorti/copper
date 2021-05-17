@@ -1,5 +1,5 @@
 defmodule Copper do
- @moduledoc """
+  @moduledoc """
   Copper HTTP Client
   """
 
@@ -8,35 +8,33 @@ defmodule Copper do
 
   @type options :: keyword()
 
-  @opaque t :: %__MODULE__{protocol: nil}
-  defstruct protocol: nil,
-            uri: nil
+  @opaque t :: %__MODULE__{protocol: Ankh.Protocol.t() | nil, uri: URI.t()}
+  defstruct protocol: nil, uri: nil
 
   @doc """
   Returns a new Http struct.
   """
-  @spec new(URI.t()) :: t
-  def new(address), do: %__MODULE__{uri: URI.parse(address)}
+  @spec new(URI.t()) :: t()
+  def new(uri), do: %__MODULE__{uri: uri}
 
   @doc """
   Performs an HTTP request
 
   Returns the client stucture to use for subsequent requests.
   """
-  @spec request(t, Request.t(), options) :: {:ok, t, Response.t()} | {:error, term}
+  @spec request(t(), Request.t(), options) :: {:ok, t(), Response.t()} | {:error, term}
   def request(client, request, options \\ [])
 
   def request(%__MODULE__{protocol: nil, uri: uri} = client, request, options) do
     with {:ok, protocol} <- HTTP.connect(uri, options) do
-      request(%__MODULE__{client | protocol: protocol}, request)
+      request(%{client | protocol: protocol}, request, options)
     end
   end
 
-  def request(%__MODULE__{protocol: protocol} = client, request, _options) do
-    request = Request.put_header(request, "user-aget", "copper/1.0")
-    with {:ok, protocol, reference} <- HTTP.request(protocol, request),
-         {:ok, protocol, response} <- await(%{client | protocol: protocol}, reference) do
-      {:ok, %{client | protocol: protocol}, response}
+  def request(%__MODULE__{} = client, request, options) do
+    with {:ok, client, reference} <- async(client, request, options),
+         {:ok, client, response} <- await(client, reference) do
+      {:ok, client, response}
     end
   end
 
@@ -45,7 +43,7 @@ defmodule Copper do
 
   Returns the request reference to be used with `await/2`.
   """
-  @spec async(t, Request.t(), options) :: {:ok, t, reference} | {:error, term}
+  @spec async(t(), Request.t(), options()) :: {:ok, t(), reference()} | {:error, any()}
   def async(client, request, options \\ [])
 
   def async(%__MODULE__{protocol: nil, uri: uri} = client, request, options) do
@@ -55,7 +53,8 @@ defmodule Copper do
   end
 
   def async(%__MODULE__{protocol: protocol} = client, request, _options) do
-    request = Request.put_header(request, "user-aget", "copper/1.0")
+    request = Request.put_header(request, "user-agent", "copper/1.0")
+
     with {:ok, protocol, reference} <- HTTP.request(protocol, request) do
       {:ok, %{client | protocol: protocol}, reference}
     end
@@ -66,8 +65,8 @@ defmodule Copper do
 
   Returns the client stucture to use for subsequent requests.
   """
-  @spec await(t(), reference) :: {:ok, t(), Response.t()} | {:error, any}
-  def await(%{protocol: protocol} = client, reference) do
+  @spec await(t(), reference()) :: {:ok, t(), Response.t()} | {:error, any()}
+  def await(%__MODULE__{protocol: protocol} = client, reference) do
     with {:ok, protocol, response} <- receive_msg(protocol, %Response{}, reference) do
       {:ok, %{client | protocol: protocol}, response}
     end
@@ -77,15 +76,15 @@ defmodule Copper do
     receive do
       msg ->
         handle_msg(protocol, request_ref, msg, response)
-
-      after 5_000 ->
+    after
+      5_000 ->
         {:error, :timeout}
     end
   end
 
   defp handle_msg(protocol, request_ref, msg, response) do
     with {:ok, protocol, responses} <- HTTP.stream(protocol, msg),
-         {:ok, protocol, {response, true}} <-
+         {:ok, protocol, {response, true = _complete}} <-
            handle_responses(protocol, response, responses, request_ref) do
       {:ok, protocol, response}
     else
@@ -95,7 +94,7 @@ defmodule Copper do
       {:error, reason} ->
         {:error, reason}
 
-      {:ok, protocol, {response, false}} ->
+      {:ok, protocol, {response, false = _complete}} ->
         receive_msg(protocol, response, request_ref)
     end
   end
@@ -108,8 +107,8 @@ defmodule Copper do
           body = if is_nil(body), do: [data], else: [data | body]
           {%Response{response | body: body}, complete}
 
-        {:headers, ^request_ref, v, complete}, {response, _complete} ->
-          {%Response{response | headers: v}, complete}
+        {:headers, ^request_ref, headers, complete}, {response, _complete} ->
+          {%Response{response | headers: headers}, complete}
 
         {:error, ^request_ref, reason, complete}, {_response, _complete} ->
           {{:error, reason}, complete}
