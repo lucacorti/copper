@@ -32,9 +32,8 @@ defmodule Copper do
   end
 
   def request(%__MODULE__{} = client, request, options) do
-    with {:ok, client, reference} <- async(client, request, options),
-         {:ok, client, response} <- await(client, reference) do
-      {:ok, client, response}
+    with {:ok, client, reference} <- async(client, request, options) do
+      await(client, reference)
     end
   end
 
