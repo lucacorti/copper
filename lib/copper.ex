@@ -52,7 +52,7 @@ defmodule Copper do
   end
 
   def async(%__MODULE__{protocol: protocol} = client, request, _options) do
-    request = Request.put_header(request, "user-agent", "copper/1.0")
+    request = HTTP.put_header(request, "user-agent", "copper/1.0")
 
     with {:ok, protocol, reference} <- HTTP.request(protocol, request) do
       {:ok, %{client | protocol: protocol}, reference}
