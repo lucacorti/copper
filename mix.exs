@@ -12,7 +12,6 @@ defmodule Copper.Mixfile do
       package: package(),
       deps: deps(),
       dialyzer: [
-        plt_add_deps: :project,
         ignore_warnings: ".dialyzer.ignore-warnings"
       ]
     ]
