@@ -87,9 +87,6 @@ defmodule Copper do
            handle_responses(protocol, response, responses, request_ref) do
       {:ok, protocol, response}
     else
-      :unknown ->
-        receive_msg(protocol, response, request_ref)
-
       {:error, reason} ->
         {:error, reason}
 
