@@ -101,10 +101,10 @@ defmodule Copper do
       |> Enum.reduce({response, false}, fn
         {:data, ^request_ref, data, complete}, {%Response{body: body} = response, _complete} ->
           body = if is_nil(body), do: [data], else: [data | body]
-          {%Response{response | body: body}, complete}
+          {%{response | body: body}, complete}
 
-        {:headers, ^request_ref, headers, complete}, {response, _complete} ->
-          {%Response{response | headers: headers}, complete}
+        {:headers, ^request_ref, headers, complete}, {%Response{} = response, _complete} ->
+          {%{response | headers: headers}, complete}
 
         {:error, ^request_ref, reason, complete}, {_response, _complete} ->
           {{:error, reason}, complete}
